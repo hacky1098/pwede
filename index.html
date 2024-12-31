@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remove URLs from File</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            text-align: center;
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5);
+        }
+        input, button {
+            margin: 10px 0;
+            padding: 10px;
+            font-size: 1rem;
+            width: 100%;
+            border-radius: 5px;
+            border: none;
+        }
+        input {
+            background: #333;
+            color: white;
+        }
+        button {
+            background: #00d9ff;
+            color: black;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #00b4cc;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Remove URLs from Text File</h1>
+    <label for="comboFile">Upload a File:</label>
+    <input type="file" id="comboFile" accept=".txt">
+    <label for="fileNameInput">Output File Name:</label>
+    <input type="text" id="fileNameInput" placeholder="filtered_file.txt">
+    <button onclick="processFile()">Process and Download</button>
+    <p id="status"></p>
+</div>
+<script>
+async function processFile() {
+    const file = document.getElementById('comboFile').files[0];
+    const outputFileName = document.getElementById('fileNameInput').value || "filtered_file.txt";
+    const status = document.getElementById('status');
+
+    if (!file) {
+        alert("Please upload a file.");
+        return;
+    }
+
+    status.textContent = "Processing file...";
+
+    const filteredLines = [];
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+    const stream = file.stream().pipeThrough(new TextDecoderStream());
+    const reader = stream.getReader();
+    let leftover = "";
+
+    let { value: chunk, done } = await reader.read();
+    while (!done) {
+        const lines = (leftover + chunk).split("\n");
+        leftover = lines.pop(); // Save the last incomplete line
+
+        for (const line of lines) {
+            // Remove URL from the line, keep only "user:pass"
+            const cleanLine = line.replace(/\s*https?:\/\/[^\s]+:?/, '').trim();
+            if (cleanLine) {
+                filteredLines.push(cleanLine);
+            }
+        }
+
+        ({ value: chunk, done } = await reader.read());
+    }
+
+    // Process the leftover line
+    if (leftover) {
+        const cleanLine = leftover.replace(/\s*https?:\/\/[^\s]+:?/, '').trim();
+        if (cleanLine) {
+            filteredLines.push(cleanLine);
+        }
+    }
+
+    // Generate output file
+    const blob = new Blob([filteredLines.join("\n")], { type: "text/plain" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = outputFileName;
+    link.click();
+
+    status.textContent = `File processed successfully. Found ${filteredLines.length} lines.`;
+}
+</script>
+</body>
+</html>
